@@ -137,7 +137,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
       if (item == null) {
           throw new IllegalArgumentException();
       }
-      
+
       if (size == 0) {
           Node node = new Node();
           node.addItem(item);
@@ -158,18 +158,43 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
       int count = 0;
 
       currentNode = head.next;
-      while (currentNode.next.count != 0 && count < currentNodeInt){
+      while (currentNode.count != 0 && count < currentNodeInt){
           currentNode = currentNode.next;
           ++count;
       }
 
-      if (currentNode.count < nodeSize - 1) {
+      if (currentNode.count == 0){
+          Node node = new Node();
+          currentNode = node;
+
+          (tail.previous).next = node;
+          node.next = tail;
+          node.previous = tail.previous;
+          tail.previous = node;
+      }
+
+      if (currentNode.count < nodeSize) {
           currentNode.addItem(offset, item);
       }
       else {
           Node newNode = new Node();
 
+          for (int i = nodeSize / 2; i < nodeSize; ++i) {
+              newNode.addItem(currentNode.data[nodeSize / 2]);
+              currentNode.removeItem(nodeSize / 2);
+          }
+          if (offset <= nodeSize / 2) {
+              currentNode.addItem(offset, item);
+          }
+          else {
+              newNode.addItem(offset - (nodeSize / 2), item);
+          }
+          newNode.next = currentNode.next;
+          newNode.previous = currentNode;
+          (currentNode.next).previous = newNode;
+          currentNode.next = newNode;
       }
+      ++size;
   }
 
   @Override
@@ -339,7 +364,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
       }
       data[count++] = item;
       //useful for debugging
-        System.out.println("Added " + item.toString() + " at index " + count + " to node "  + Arrays.toString(data));
+        //System.out.println("Added " + item.toString() + " at index " + count + " to node "  + Arrays.toString(data));
     }
   
     /**
