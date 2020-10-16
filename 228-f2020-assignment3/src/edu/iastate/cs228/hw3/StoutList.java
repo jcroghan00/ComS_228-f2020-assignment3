@@ -69,10 +69,10 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
   
   /**
    * Constructor for grading only.  Fully implemented. 
-   * @param head
-   * @param tail
-   * @param nodeSize
-   * @param size
+   * @param head the dummy node at the beginning of the list
+   * @param tail the dummy node at the end of the list
+   * @param nodeSize the amount of elements able to be stored in any one node
+   * @param size the total amount of elements currently stored in the list
    */
   public StoutList(Node head, Node tail, int nodeSize, int size)
   {
@@ -198,7 +198,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
   public E remove(int pos)
   {
       Node currentNode;
-      E removed = null;
+      E removed;
       
       int currentNodeInt = pos / nodeSize;
       int offset = pos % nodeSize;
@@ -224,9 +224,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
               currentNode.next.previous= currentNode.previous;
               currentNode.next = null;
               currentNode.previous = null;
-
-              --size;
-              return removed;
           }
           else {
               removed = currentNode.data[offset];
@@ -278,6 +275,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
 
       Node currentNode = head.next;
 
+      // Unchecked warning unavoidable.
 	  E[] listData = (E[]) new Comparable[size];
 
 	  int count = 0;
@@ -314,6 +312,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
 
       Node currentNode = head.next;
 
+      // Unchecked warning unavoidable.
       E[] listData = (E[]) new Comparable[size];
 
       int count = 0;
@@ -507,7 +506,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
 	Node currentNode;
 	int currentIndex;
 	int currentPosition;
-	int totalIndex;
     /**
      * Default constructor 
      */
@@ -516,7 +514,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
     	currentNode = head.next;
     	currentIndex = 0;
     	currentPosition = 0;
-    	totalIndex = 0;
     }
 
     /**
@@ -551,7 +548,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
             for (int i = currentIndex; i < nodeSize; ++i) {
                 if (currentNode.data[i] != null){
                     ++currentPosition;
-                    ++totalIndex;
                     ++currentIndex;
                     return currentNode.data[i];
                 }
@@ -563,7 +559,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
             currentNode = currentNode.next;
             currentIndex = 1;
             ++currentPosition;
-            ++totalIndex;
 
             return currentNode.data[0];
         }
@@ -578,7 +573,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
     {
         if (currentIndex > 0) {
             --currentPosition;
-            --totalIndex;
             --currentIndex;
             return currentNode.data[currentIndex];
         }
@@ -586,7 +580,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
             for (int i = nodeSize - 1; i > 0; --i) {
                 if (currentNode.data[i] != null) {
                     --currentPosition;
-                    --totalIndex;
+
                     --currentIndex;
 
                     currentNode = currentNode.previous;
@@ -603,15 +597,18 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
     @Override
     public int nextIndex()
     {
-        //TODO
-        return 0;
+        StoutListIterator tempIterator = new StoutListIterator(currentPosition);
+        tempIterator.next();
+        return tempIterator.currentPosition;
     }
 
     @Override
     public int previousIndex()
     {
-        //TODO
-        return 0;
+        StoutListIterator tempIterator = new StoutListIterator(currentPosition);
+        tempIterator.previous();
+        if (currentPosition != tempIterator.currentPosition) { return tempIterator.currentPosition; }
+        else { return -1; }
     }
 
     @Override
