@@ -82,14 +82,26 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
 	  this.size = size; 
   }
 
+  /**
+   * Returns the current amount of items held within the list.
+   *
+   * @return the size of the list
+   * */
   @Override
   public int size() { return size; }
-  
+
+  /**
+   * Adds the item provided at the end of the current list.
+   *
+   * @param item the item to be added to the list
+   * @return true is the addition succeeded, false otherwise
+   * @throws NullPointerException if the item is equal to null
+   */
   @Override
   public boolean add(E item)
   {
     if (item == null) {
-        throw new IllegalArgumentException();
+        throw new NullPointerException();
     }
 
     if (size == 0) {
@@ -128,27 +140,23 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
     return false;
   }
 
+  /**
+   * The rules for adding an item at pos are as follows:
+   *    -if the list is empty, create a new node and put item at offset 0
+   *    -otherwise if offset = 0 and one of the following two cases occurs:
+   *        -if n has a predecessor which has fewer than nodeSize elements (and is not the head), put item in n’s predecessor
+   *        -if n is the tail node and n’s predecessor has nodeSize elements, create a new node and put item at offset 0
+   *    -otherwise if there is space in node n, put item in node n at offset, shifting array elements as necessary
+   *    -otherwise, perform a split operation: move the last nodeSize / 2 elements of node n into a new successor node n', and then:
+   *        -if offset <= nodeSize / 2, put item in node n at offset off
+   *        -if offset > nodeSize / 2, put item in node n' at offset (offset - nodeSize / 2)
+   *
+   * @param pos the position at which to place the item
+   * @param item the item to be added to the list
+   */
   @Override
   public void add(int pos, E item)
   {
-      if (item == null) {
-          throw new IllegalArgumentException();
-      }
-
-      if (size == 0) {
-          Node node = new Node();
-          node.addItem(item);
-
-          node.next = tail;
-          node.previous = head;
-
-          head.next = node;
-          tail.previous = node;
-
-          ++size;
-          return;
-      }
-
       Node currentNode;
       int currentNodeInt = pos / nodeSize;
       int offset = pos % nodeSize;
@@ -170,92 +178,54 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
           tail.previous = node;
       }
 
-      if (currentNode.count < nodeSize) {
-          currentNode.addItem(offset, item);
-      }
-      else {
-          Node newNode = new Node();
-
-          for (int i = nodeSize / 2; i < nodeSize; ++i) {
-              newNode.addItem(currentNode.data[nodeSize / 2]);
-              currentNode.removeItem(nodeSize / 2);
-          }
-          if (offset <= nodeSize / 2) {
-              currentNode.addItem(offset, item);
-          }
-          else {
-              newNode.addItem(offset - (nodeSize / 2), item);
-          }
-          newNode.next = currentNode.next;
-          newNode.previous = currentNode;
-          (currentNode.next).previous = newNode;
-          currentNode.next = newNode;
-      }
-      ++size;
+      NodeInfo nodeInfo = new NodeInfo(currentNode, offset);
+      nodeInfo.add(item);
   }
 
+    /**
+     * The rules for removing an element are:
+     *      -if the node n containing X is the last node and has only one element, delete it
+     *      -otherwise, if n is the last node (thus with two or more elements) , or if n has more than elements, remove
+     *          X from n, shifting elements as necessary
+     *      -otherwise (the node n must have at most elements), look at its successor n' (note that we don’t look at
+     *          the predecessor of n) and perform a merge operation as follows:
+     *          -if the successor node n' has more than elements, move the first element from n' to n (mini-merge)
+     *          -if the successor node n' has or fewer elements, then move all elements from n' to n and delete n' (full merge)
+     *
+     * @param pos the position of the item to be removed
+     * @return the item that was removed
+     */
   @Override
   public E remove(int pos)
   {
-      Node currentNode;
-      E removed;
-      
-      int currentNodeInt = pos / nodeSize;
-      int offset = pos % nodeSize;
+      if(pos > size) { throw new IndexOutOfBoundsException(); }
 
-      int count = 0;
+      Node currentNode;
+
       currentNode = head.next;
-      while (currentNode.count != 0 && count < currentNodeInt){
+      int count = currentNode.count;
+      while (count < pos){
           currentNode = currentNode.next;
-          ++count;
+          count += currentNode.count;
       }
 
+      int offset;
       if(currentNode.count == 0) {
           currentNode = currentNode.previous;
-          offset = currentNode.count - 1;
-      }
-
-      if((currentNode.next.count == 0 || currentNode.count > nodeSize / 2)) {
-          if(currentNode.count == 1) {
-              removed = currentNode.data[0];
-              currentNode.removeItem(0);
-
-              currentNode.previous.next = tail;
-              currentNode.next.previous= currentNode.previous;
-              currentNode.next = null;
-              currentNode.previous = null;
-          }
-          else {
-              removed = currentNode.data[offset];
-              currentNode.removeItem(offset);
-          }
-
+          offset = currentNode.count;
       }
       else {
-          if(currentNode.next.count > nodeSize / 2) {
-              removed = currentNode.data[offset];
-              currentNode.removeItem(offset);
-
-              currentNode.addItem(count, currentNode.next.data[0]);
-              currentNode.next.removeItem(0);
-          }
-          else {
-              currentNode.removeItem(offset);
-              removed = currentNode.data[offset];
-
-              for(int i = 0; i < currentNode.next.count; ++i) {
-                  currentNode.addItem(count, currentNode.next.data[i]);
-              }
-
-              currentNode.next.previous = null;
-              currentNode.next = currentNode.next.next;
-              currentNode.next.previous.next = null;
-              currentNode.next.previous = currentNode;
-          }
+          offset = pos - (count - currentNode.count);
       }
 
-      --size;
-      return removed;
+      if(offset > currentNode.count - 1) {
+          currentNode = currentNode.next;
+          offset = 0;
+      }
+
+      NodeInfo nodeInfo = new NodeInfo(currentNode, offset);
+
+      return nodeInfo.remove();
   }
 
   /**
@@ -270,7 +240,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
    */
   public void sort()
   {
-	  listComparator comp = new listComparator();
+	  ListComparator comp = new ListComparator();
 	  StoutListIterator iterator = new StoutListIterator();
 
       Node currentNode = head.next;
@@ -310,7 +280,7 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
   {
       StoutListIterator iterator = new StoutListIterator();
 
-      Node currentNode = head.next;
+      Node currentNode = head;
 
       // Unchecked warning unavoidable.
       E[] listData = (E[]) new Comparable[size];
@@ -336,13 +306,29 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
 
       this.addAll(Arrays.asList(listData));
   }
-  
+
+  /**
+   * Constructs a new StoutListIterator
+   *
+   * @return the StoutListIterator
+   */
   @Override
   public Iterator<E> iterator() { return new StoutListIterator(); }
 
+  /**
+   * Constructs a new StoutListIterator
+   *
+   * @return the StoutListIterator
+   */
   @Override
   public ListIterator<E> listIterator() { return new StoutListIterator(); }
 
+  /**
+   * Constructs a new StoutListIterator at the given index
+   *
+   * @param index the position at which to construct the new StoutListIterator
+   * @return the StoutListIterator
+   */
   @Override
   public ListIterator<E> listIterator(int index) { return new StoutListIterator(index); }
   
@@ -500,20 +486,49 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
       --count;
     }
   }
- 
+
+  /**
+   * Used to iterate through the list and determine if there is a next/previous element, what that element is,
+   * and add, remove, or set the item at that position
+   */
   private class StoutListIterator implements ListIterator<E>
   {
+      /**
+       * The current node selected by the iterator
+       */
 	Node currentNode;
+
+	/**
+     * The current offset within the currentNode
+     */
 	int currentIndex;
+
+	/**
+     * The overall position of the cursor
+     */
 	int currentPosition;
+
+	/**
+     * Checks whether or not next() or previous() have been called since the last add() or remove()
+     */
+	boolean nextOrPrev;
+
+	/**
+     * The last index returned by next() or previous()
+     */
+	int returnedIndex;
+
     /**
      * Default constructor 
      */
     public StoutListIterator()
     {
-    	currentNode = head.next;
+    	currentNode = head;
+        next();
     	currentIndex = 0;
     	currentPosition = 0;
+        nextOrPrev = false;
+        returnedIndex = -1;
     }
 
     /**
@@ -523,10 +538,29 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
      */
     public StoutListIterator(int pos)
     {
-        currentPosition = pos;
-    	currentIndex = pos % nodeSize;
+        currentPosition = pos - 1;
+    	currentIndex = (pos % nodeSize) - 1;
+        nextOrPrev = false;
+        returnedIndex = -1;
+
+        int currentNodeInt = pos / nodeSize;
+        int count = 0;
+
+        currentNode = head;
+        next();
+        while (currentNode.count != 0 && count < currentNodeInt){
+            currentNode = currentNode.next;
+            ++count;
+        }
+
     }
 
+    /**
+     * Returns true if this list iterator has more elements when traversing the list in the forward direction.
+     * (In other words, returns true if next() would return an element rather than throwing an exception.)
+     *
+     * @return true if the list iterator has more elements when traversing the list in the forward direction
+     */
     @Override
     public boolean hasNext()
     {
@@ -540,93 +574,187 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
         return currentNode.next.count != 0;
     }
 
+    /**
+     * Returns the next element in the list and advances the cursor position. This method may be called repeatedly
+     * to iterate through the list, or intermixed with calls to previous() to go back and forth. (Note that alternating
+     * calls to next and previous will return the same element repeatedly.)
+     *
+     * @return the next element in the list
+     * @throws NoSuchElementException if the iteration has no next element
+     */
     @Override
     public E next()
     {
-        if (currentIndex < nodeSize)
+        if(currentNode.count == 0)
+        {
+            if (currentNode.next.count != 0) {
+                currentNode = currentNode.next;
+                currentIndex = 0;
+                ++currentPosition;
+
+                nextOrPrev = true;
+                returnedIndex = 0;
+                return currentNode.data[0];
+            }
+        }
+        else if (currentIndex < nodeSize)
         {
             for (int i = currentIndex; i < nodeSize; ++i) {
                 if (currentNode.data[i] != null){
                     ++currentPosition;
                     ++currentIndex;
+
+                    nextOrPrev = true;
+                    returnedIndex = i;
                     return currentNode.data[i];
                 }
                 ++currentPosition;
             }
         }
-        if (currentNode.next.count != 0)
-        {
+        if (currentNode.next.count != 0) {
             currentNode = currentNode.next;
             currentIndex = 1;
             ++currentPosition;
 
+            nextOrPrev = true;
+            returnedIndex = 0;
             return currentNode.data[0];
         }
-        return null;
+        throw new NoSuchElementException();
     }
 
+    /**
+     * Returns true if this list iterator has more elements when traversing the list in the reverse direction.
+     * (In other words, returns true if previous() would return an element rather than throwing an exception.)
+     *
+     * @return true if the list iterator has more elements when traversing the list in the reverse direction
+     */
     @Override
-    public boolean hasPrevious() { return currentIndex > 0 || currentNode.previous.count != 0; }
+    public boolean hasPrevious() { return currentPosition > 0 || currentNode.previous.count != 0; }
 
+    /**
+     * Returns the previous element in the list and moves the cursor position backwards. This method may be called
+     * repeatedly to iterate through the list backwards, or intermixed with calls to next() to go back and forth.
+     * (Note that alternating calls to next and previous will return the same element repeatedly.)
+     *
+     * @return the previous element in the list
+     * @throws NoSuchElementException if the iteration has no previous element
+     */
     @Override
     public E previous()
     {
         if (currentIndex > 0) {
             --currentPosition;
             --currentIndex;
+
+            nextOrPrev = true;
+            returnedIndex = currentPosition;
             return currentNode.data[currentIndex];
         }
         if (currentNode.previous.count != 0) {
             for (int i = nodeSize - 1; i > 0; --i) {
                 if (currentNode.data[i] != null) {
                     --currentPosition;
-
                     --currentIndex;
 
                     currentNode = currentNode.previous;
                     currentIndex = 0;
 
+                    nextOrPrev = true;
+                    returnedIndex = currentPosition;
                     return currentNode.data[i];
                 }
                 --currentPosition;
             }
         }
-        return null;
+        throw new NoSuchElementException();
     }
 
+    /**
+     * Returns the index of the element that would be returned by a subsequent call to next().
+     * (Returns list size if the list iterator is at the end of the list.)
+     *
+     * @return the index of the element that would be returned by a subsequent call to next, or list size if the
+     *            list iterator is at the end of the list
+     */
     @Override
     public int nextIndex()
     {
-        StoutListIterator tempIterator = new StoutListIterator(currentPosition);
-        tempIterator.next();
-        return tempIterator.currentPosition;
+        return currentPosition;
     }
 
+    /**
+     * Returns the index of the element that would be returned by a subsequent call to previous().
+     * (Returns -1 if the list iterator is at the beginning of the list.)
+     *
+     * @return the index of the element that would be returned by a subsequent call to previous, or -1 if the
+     *            list iterator is at the beginning of the list
+     */
     @Override
     public int previousIndex()
     {
-        StoutListIterator tempIterator = new StoutListIterator(currentPosition);
-        tempIterator.previous();
-        if (currentPosition != tempIterator.currentPosition) { return tempIterator.currentPosition; }
-        else { return -1; }
+        return currentPosition - 1;
     }
 
+    /**
+     * Removes from the list the last element that was returned by next() or previous() (optional operation).
+     * This call can only be made once per call to next or previous. It can be made only if add(E) has not been called
+     * after the last call to next or previous.
+     *
+     * @throws IllegalStateException if neither next nor previous have been called, or remove or add have been called
+     *              after the last call to next or previous
+     */
     @Override
     public void remove()
     {
-        //TODO
+        if(!nextOrPrev) { throw new IllegalStateException(); }
+
+        NodeInfo nodeInfo = new NodeInfo(currentNode, returnedIndex % 4);
+        nodeInfo.remove();
+
+        nextOrPrev = false;
     }
 
+    /**
+     * Replaces the last element returned by next() or previous() with the specified element (optional operation).
+     * This call can be made only if neither remove() nor add(E) have been called after the last call to next or previous.
+     *
+     * @param e the element with which to replace the last element returned by next or previous
+     * @throws IllegalArgumentException if some aspect of the specified element prevents it from being added to this list
+     * @throws IllegalStateException if neither next nor previous have been called, or remove or add have been called
+     *              after the last call to next or previous
+     */
     @Override
     public void set(E e)
     {
-        // TODO
+        if(e == null) { throw new IllegalArgumentException(); }
+        if(!nextOrPrev) { throw new IllegalStateException(); }
+
+        currentNode.removeItem(returnedIndex);
+        --returnedIndex;
+        currentNode.addItem(returnedIndex, e);
     }
 
+    /**
+     * Inserts the specified element into the list (optional operation). The element is inserted immediately before
+     * the element that would be returned by next(), if any, and after the element that would be returned by previous(),
+     * if any. (If the list contains no elements, the new element becomes the sole element on the list.) The new
+     * element is inserted before the implicit cursor: a subsequent call to next would be unaffected, and a subsequent
+     * call to previous would return the new element. (This call increases by one the value that would be returned
+     * by a call to nextIndex or previousIndex.)
+     *
+     * @param e the element to insert
+     * @throws IllegalArgumentException if some aspect of this element prevents it from being added to this list
+     */
     @Override
     public void add(E e)
     {
-        // TODO
+        if(e == null) { throw new IllegalArgumentException(); }
+
+        NodeInfo nodeInfo = new NodeInfo(currentNode, returnedIndex % 4);
+        nodeInfo.add(e);
+
+        nextOrPrev = false;
     }
 
       // Other methods you may want to add or override that could possibly facilitate
@@ -642,7 +770,6 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
    * @param arr   array storing elements from the list 
    * @param comp  comparator used in sorting 
    */
-
   private void insertionSort(E[] arr, Comparator<? super E> comp)
   {
       int i, j;
@@ -686,10 +813,145 @@ public class StoutList<E extends Comparable<? super E>> extends AbstractSequenti
       }
   }
 
-  private class listComparator implements Comparator<E>
+    /**
+     * The NodeInfo class is used to assist in adding and removing items from
+     * the list. It stores a node and the index that the operation has to be
+     * done on.
+     */
+  private class NodeInfo
+  {
+      /**
+       * The node that contains the position that the operation has to be done on.
+       */
+      Node node;
+
+      /**
+       * The index of the position within the given node.
+       */
+      int offset;
+
+      /**
+       * Constructs a new NodeInfo with the given node and offset.
+       *
+       * @param node the node with the item
+       * @param offset the index of the item within the node
+       */
+      NodeInfo(Node node, int offset)
+      {
+          this.node = node;
+          this.offset = offset;
+      }
+
+      /**
+       * Adds an item to the node at the offset given to the constructor.
+       *
+       * @param item the item to be added to the list
+       */
+      public void add(E item)
+      {
+          if (item == null) {
+              throw new NullPointerException();
+          }
+
+          if (size == 0) {
+              Node node = new Node();
+              node.addItem(item);
+
+              node.next = tail;
+              node.previous = head;
+
+              head.next = node;
+              tail.previous = node;
+
+              ++size;
+              return;
+          }
+
+          if (node.count < nodeSize) {
+              node.addItem(offset, item);
+          }
+          else {
+              Node newNode = new Node();
+
+              for (int i = nodeSize / 2; i < nodeSize; ++i) {
+                  newNode.addItem(node.data[nodeSize / 2]);
+                  node.removeItem(nodeSize / 2);
+              }
+              if (offset <= nodeSize / 2) {
+                  node.addItem(offset, item);
+              }
+              else {
+                  newNode.addItem(offset - (nodeSize / 2), item);
+              }
+              newNode.next = node.next;
+              newNode.previous = node;
+              (node.next).previous = newNode;
+              node.next = newNode;
+          }
+          ++size;
+      }
+
+      /**
+       * Removes the item at the offset given to the constructor.
+       *
+       * @return the item that was removed
+       */
+      public E remove()
+      {
+          E removed;
+
+          if((node.next.count == 0 || node.count > nodeSize / 2)) {
+              if(node.count == 1) {
+                  removed = node.data[0];
+                  node.removeItem(0);
+
+                  node.previous.next = tail;
+                  node.next.previous= node.previous;
+                  node.next = null;
+                  node.previous = null;
+              }
+              else {
+                  removed = node.data[offset];
+                  node.removeItem(offset);
+              }
+
+          }
+          else {
+              if(node.next.count > nodeSize / 2) {
+                  removed = node.data[offset];
+                  node.removeItem(offset);
+
+                  node.addItem(node.count, node.next.data[0]);
+                  node.next.removeItem(0);
+              }
+              else {
+                  node.removeItem(offset);
+                  removed = node.data[offset];
+
+                  for(int i = 0; i < node.next.count; ++i) {
+                      node.addItem(node.count, node.next.data[i]);
+                  }
+
+                  node.next.previous = null;
+                  node.next = node.next.next;
+                  node.next.previous.next = null;
+                  node.next.previous = node;
+              }
+          }
+
+          --size;
+          return removed;
+      }
+  }
+
+  /**
+   * The comparator used to see if two Comparable<E> objects are equal.
+   */
+  private class ListComparator implements Comparator<E>
   {
       @Override
-      public int compare(E o1, E o2) {
+      public int compare(E o1, E o2)
+      {
           return o1.compareTo(o2);
       }
   }
